@@ -90,7 +90,7 @@ const createUser = async (req, res) => {
         //check for unique email
         const email = await UserModel.findOne({ email: data.email })
         if (email) {
-            res.status(400).send({ status: false, message: "email already exist" })
+            return res.status(400).send({ status: false, message: "email already exist" })
         }
 
         //password----------------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ const createUser = async (req, res) => {
             return res.status(400).send({ status: false, message: "password is missing" })
 
         if (data.password.length < 8 || data.password.length > 15)
-            return res.status(400).send({ message: "password length must be minimum of 8 character" })
+            return res.status(400).send({ message: "password length must be minimum of 8 and max of 15 character" })
 
         if (!validatePassword(data.password)) {
             return res.status(400).send({ status: false, message: "password should contain atleast one number,one special character and one capital letter" })//password validation
@@ -110,17 +110,25 @@ const createUser = async (req, res) => {
 
 
         //address---------------------------------------------------------------------------------------------------
+        let street = data.address.street
         let city = data.address.city
         let pincode = data.address.pincode
+        if(street){
+            let validateStreet = /^[a-zA-Z0-9]/
+            if (!validateStreet.test(street)) {
+                return res.status(400).send({ status: false, message: "enter valid street name" })
+            }
+        }
+
         if (city) {
-            let validateStreet = /^[a-zA-z',.\s-]{1,25}$/gm
-            if (!validateStreet.test(city)) {
+            let validateCity = /^[a-zA-z',.\s-]{1,25}$/gm
+            if (!validateCity.test(city)) {
                 return res.status(400).send({ status: false, message: "enter valid city name" })
             }
         }
         if (pincode) {
-            let validateStreet = /^[1-9]{1}[0-9]{2}\s{0,1}[0-9]{3}$/gm      //must not start with 0,6 digits and space(optional)
-            if (!validateStreet.test(pincode)) {
+            let validatePincode = /^[1-9]{1}[0-9]{2}\s{0,1}[0-9]{3}$/gm      //must not start with 0,6 digits and space(optional)
+            if (!validatePincode.test(pincode)) {
                 return res.status(400).send({ status: false, message: "enter valid pincode" })
             }
         }
@@ -144,41 +152,46 @@ const login = async function (req, res) {
     try {
         const data = req.body
 
+        //check for empty body
         if (Object.keys(data).length == 0) {
-            return res.status(400).send({ status: false, msg: "cannot be empty" })//details is given or not
+            return res.status(400).send({ status: false, message: "please enter emailId and password" })//details is given or not
         }
 
-        let email = req.body.email
-        let password = req.body.password
+        let email = data.email
+        let password = data.password
+        //email missing
         if (!email)
-            return res.status(400).send({ status: fasle, msg: "email is missing" })
+            return res.status(400).send({ status: fasle, message: "email is missing" })
 
+        //password missing
         if (!password)
-            return res.status(400).send({ status: false, msg: "password not given" })
+            return res.status(400).send({ status: false, message: "password is missing" })
 
-
-        const match = await AuthorModel.findOne({ email: email })//verification
+        //check if emial is present in our collection
+        const match = await UserModel.findOne({ email: email })//verification
 
         if (!match)
-            return res.status(401).send({ status: false, msg: "email does not match" })
+            return res.status(401).send({ status: false, msg: "INVALID EMAIL" })
 
         let p = await bcrypt.compare(password, match.password)
         if (!p)
             return res.status(401).send({ status: false, msg: "invalid password" })
+
+        //if user successful login provise the user with jwt token
         const token = jwt.sign(
             {
-                authorId: match._id,
+                userId: match._id,
                 iat: Math.floor(Date.now() / 1000),
                 exp: Math.floor(Date.now() / 1000) + 10 * 60 * 60 //login successfully give the token
             },
-            "group11" //secret key
+            "group12" //secret key
         )
-        res.cookie('jwt', token)
+        
         res.setHeader("x-api-key", token)
-        res.status(200).send({ status: true, message: 'author login successful', data: token })
+        res.status(200).send({ status: true, message: 'user login successful', data: token })
     }
     catch (err) {
         res.status(500).send({ status: false, error: err.message })
     }
 }
-module.exports = { createUser }
+module.exports = { createUser ,login}
